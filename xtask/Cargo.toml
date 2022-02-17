@@ -6,5 +6,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-structopt = {version = "0.3", default-features = false }
+structopt = { version = "0.3", default-features = false }
+aya-gen = { git = "http://github.com/aya-rs/aya", branch = "main" }
+
 anyhow = "1"

@@ -3,11 +3,16 @@
 
 use aya_bpf::{
     bindings::xdp_action,
-    macros::xdp,
+    macros::{map, xdp},
+    maps::PerfEventArray,
     programs::XdpContext,
 };
+use ebpfapp_common::PacketLog;
 
-#[xdp(name="ebpfapp")]
+#[map(name = "EVENTS")]
+static mut EVENTS: PerfEventArray<PacketLog> = PerfEventArray::with_max_entries(1034, 0);
+
+#[xdp(name = "ebpfapp")]
 pub fn ebpfapp(ctx: XdpContext) -> u32 {
     match unsafe { try_ebpfapp(ctx) } {
         Ok(ret) => ret,

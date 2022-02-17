@@ -1,9 +1,10 @@
 use anyhow::Context;
+use aya::maps::perf::PerfEventArray;
 use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use log::info;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use structopt::StructOpt;
 use tokio::signal;
 
@@ -38,6 +39,9 @@ async fn main() -> Result<(), anyhow::Error> {
     program.load()?;
     program.attach(&opt.iface, XdpFlags::SKB_MODE)
         .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
+
+
+    let mut perf_array = PerfEventArray::try_from(bpf.map_mut("EVENTS")?)?;
 
     info!("Waiting for Ctrl-C...");
     signal::ctrl_c().await?;

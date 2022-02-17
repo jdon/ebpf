@@ -1,0 +1,18 @@
+[package]
+name = "ebpfapp-ebpf"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+aya-bpf = { git = "http://github.com/aya-rs/aya", branch = "main" }
+ebpfapp-common = { path = "../ebpfapp-common" }
+
+[[bin]]
+name = "ebpfapp"
+path = "src/main.rs"
+
+[profile.release]
+panic = "abort"
+
+[workspace]
+members = []

@@ -6,6 +6,7 @@ edition = "2018"
 [dependencies]
 aya-bpf = { git = "http://github.com/aya-rs/aya", branch = "main" }
 ebpfapp-common = { path = "../ebpfapp-common" }
+memoffset = "0.6"
 
 [[bin]]
 name = "ebpfapp"

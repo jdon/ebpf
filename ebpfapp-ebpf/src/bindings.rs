@@ -95,6 +95,187 @@ pub struct ethhdr {
 pub type __sum16 = __u16;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct tcphdr {
+    pub source: __be16,
+    pub dest: __be16,
+    pub seq: __be32,
+    pub ack_seq: __be32,
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 2usize]>,
+    pub window: __be16,
+    pub check: __sum16,
+    pub urg_ptr: __be16,
+}
+impl tcphdr {
+    #[inline]
+    pub fn res1(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 4u8) as u16) }
+    }
+    #[inline]
+    pub fn set_res1(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(0usize, 4u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn doff(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(4usize, 4u8) as u16) }
+    }
+    #[inline]
+    pub fn set_doff(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(4usize, 4u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn fin(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(8usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_fin(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(8usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn syn(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(9usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_syn(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(9usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn rst(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(10usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_rst(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(10usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn psh(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(11usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_psh(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(11usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn ack(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(12usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_ack(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(12usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn urg(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(13usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_urg(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(13usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn ece(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(14usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_ece(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(14usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn cwr(&self) -> __u16 {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(15usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_cwr(&mut self, val: __u16) {
+        unsafe {
+            let val: u16 = ::core::mem::transmute(val);
+            self._bitfield_1.set(15usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(
+        res1: __u16,
+        doff: __u16,
+        fin: __u16,
+        syn: __u16,
+        rst: __u16,
+        psh: __u16,
+        ack: __u16,
+        urg: __u16,
+        ece: __u16,
+        cwr: __u16,
+    ) -> __BindgenBitfieldUnit<[u8; 2usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 2usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 4u8, {
+            let res1: u16 = unsafe { ::core::mem::transmute(res1) };
+            res1 as u64
+        });
+        __bindgen_bitfield_unit.set(4usize, 4u8, {
+            let doff: u16 = unsafe { ::core::mem::transmute(doff) };
+            doff as u64
+        });
+        __bindgen_bitfield_unit.set(8usize, 1u8, {
+            let fin: u16 = unsafe { ::core::mem::transmute(fin) };
+            fin as u64
+        });
+        __bindgen_bitfield_unit.set(9usize, 1u8, {
+            let syn: u16 = unsafe { ::core::mem::transmute(syn) };
+            syn as u64
+        });
+        __bindgen_bitfield_unit.set(10usize, 1u8, {
+            let rst: u16 = unsafe { ::core::mem::transmute(rst) };
+            rst as u64
+        });
+        __bindgen_bitfield_unit.set(11usize, 1u8, {
+            let psh: u16 = unsafe { ::core::mem::transmute(psh) };
+            psh as u64
+        });
+        __bindgen_bitfield_unit.set(12usize, 1u8, {
+            let ack: u16 = unsafe { ::core::mem::transmute(ack) };
+            ack as u64
+        });
+        __bindgen_bitfield_unit.set(13usize, 1u8, {
+            let urg: u16 = unsafe { ::core::mem::transmute(urg) };
+            urg as u64
+        });
+        __bindgen_bitfield_unit.set(14usize, 1u8, {
+            let ece: u16 = unsafe { ::core::mem::transmute(ece) };
+            ece as u64
+        });
+        __bindgen_bitfield_unit.set(15usize, 1u8, {
+            let cwr: u16 = unsafe { ::core::mem::transmute(cwr) };
+            cwr as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct iphdr {
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
@@ -145,6 +326,42 @@ impl iphdr {
         __bindgen_bitfield_unit
     }
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct udphdr {
+    pub source: __be16,
+    pub dest: __be16,
+    pub len: __be16,
+    pub check: __sum16,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct icmphdr {
+    pub type_: __u8,
+    pub code: __u8,
+    pub checksum: __sum16,
+    pub un: icmphdr__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union icmphdr__bindgen_ty_1 {
+    pub echo: icmphdr__bindgen_ty_1__bindgen_ty_1,
+    pub gateway: __be32,
+    pub frag: icmphdr__bindgen_ty_1__bindgen_ty_2,
+    pub reserved: [__u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct icmphdr__bindgen_ty_1__bindgen_ty_1 {
+    pub id: __be16,
+    pub sequence: __be16,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct icmphdr__bindgen_ty_1__bindgen_ty_2 {
+    pub __unused: __be16,
+    pub mtu: __be16,
+}
 
 impl<Storage> __BindgenBitfieldUnit<Storage> {}
 impl ethhdr {
@@ -156,6 +373,29 @@ impl ethhdr {
     }
     pub fn h_proto(&self) -> Option<__be16> {
         unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.h_proto) }.ok()
+    }
+}
+impl tcphdr {
+    pub fn source(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.source) }.ok()
+    }
+    pub fn dest(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.dest) }.ok()
+    }
+    pub fn seq(&self) -> Option<__be32> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.seq) }.ok()
+    }
+    pub fn ack_seq(&self) -> Option<__be32> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.ack_seq) }.ok()
+    }
+    pub fn window(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.window) }.ok()
+    }
+    pub fn check(&self) -> Option<__sum16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.check) }.ok()
+    }
+    pub fn urg_ptr(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.urg_ptr) }.ok()
     }
 }
 impl iphdr {
@@ -185,5 +425,63 @@ impl iphdr {
     }
     pub fn daddr(&self) -> Option<__be32> {
         unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.daddr) }.ok()
+    }
+}
+impl udphdr {
+    pub fn source(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.source) }.ok()
+    }
+    pub fn dest(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.dest) }.ok()
+    }
+    pub fn len(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.len) }.ok()
+    }
+    pub fn check(&self) -> Option<__sum16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.check) }.ok()
+    }
+}
+impl icmphdr {
+    pub fn type_(&self) -> Option<__u8> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.type_) }.ok()
+    }
+    pub fn code(&self) -> Option<__u8> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.code) }.ok()
+    }
+    pub fn checksum(&self) -> Option<__sum16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.checksum) }.ok()
+    }
+    pub fn un(&self) -> Option<icmphdr__bindgen_ty_1> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.un) }.ok()
+    }
+}
+impl icmphdr__bindgen_ty_1 {
+    pub fn echo(&self) -> Option<icmphdr__bindgen_ty_1__bindgen_ty_1> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.echo) }.ok()
+    }
+    pub fn gateway(&self) -> Option<__be32> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.gateway) }.ok()
+    }
+    pub fn frag(&self) -> Option<icmphdr__bindgen_ty_1__bindgen_ty_2> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.frag) }.ok()
+    }
+    pub fn reserved(&self) -> Option<[__u8; 4usize]> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.reserved) }.ok()
+    }
+}
+impl icmphdr__bindgen_ty_1__bindgen_ty_1 {
+    pub fn id(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.id) }.ok()
+    }
+    pub fn sequence(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.sequence) }.ok()
+    }
+}
+impl icmphdr__bindgen_ty_1__bindgen_ty_2 {
+    pub fn __unused(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.__unused) }.ok()
+    }
+    pub fn mtu(&self) -> Option<__be16> {
+        unsafe { ::aya_bpf::helpers::bpf_probe_read(&self.mtu) }.ok()
     }
 }

@@ -8,7 +8,7 @@ use ebpfapp_common::PacketLog;
 use log::info;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
 use std::convert::{TryFrom, TryInto};
-use std::net;
+use std::net::{self, Ipv4Addr};
 use structopt::StructOpt;
 use tokio::{signal, task};
 
@@ -54,6 +54,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .map(|_| BytesMut::with_capacity(1024))
                 .collect::<Vec<_>>();
 
+            let ssh_addr = "10.0.2.2".parse::<Ipv4Addr>().unwrap();
             loop {
                 let events = buf.read_events(&mut buffers).await.unwrap();
                 for i in 0..events.read {
@@ -61,7 +62,19 @@ async fn main() -> Result<(), anyhow::Error> {
                     let ptr = buf.as_ptr() as *const PacketLog;
                     let data = unsafe { ptr.read_unaligned() };
                     let src_addr = net::Ipv4Addr::from(data.ipv4_address);
-                    println!("LOG: SRC {}, ACTION {}", src_addr, data.action);
+                    let dst_addr = net::Ipv4Addr::from(data.ipv4_destination);
+                    let packet_type = match data.packet_type {
+                        6 => "TCP",
+                        17 => "UDP",
+                        1 => "ICMP",
+                        _ => "UNKNOWN",
+                    };
+                    if src_addr != ssh_addr {
+                        println!(
+                            "LOG: SRC {}, DST{} , packet_type {} - {}, ACTION {}",
+                            src_addr, dst_addr, data.packet_type, packet_type, data.action
+                        );
+                    }
                 }
             }
         });

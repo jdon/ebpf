@@ -65,7 +65,7 @@ fn is_ipv4(ctx: &XdpContext) -> Result<bool, ()> {
     // Get protocol type of ethernet frame
     let h_proto = u16::from_be(unsafe { *ptr_at(&ctx, offset_of!(ethhdr, h_proto))? });
     // Check if it's ipv4, if isn't then allow it.
-    if h_proto != ETH_P_IP {
+    if h_proto == ETH_P_IP {
         return Ok(true);
     }
     Ok(false)

@@ -22,24 +22,7 @@ struct Opt {
     iface: String,
 }
 
-fn load_bpf(interface: &str) -> Result<(), anyhow::Error> {
-    // This will include your eBPF object file as raw bytes at compile-time and load it at
-    // runtime. This approach is recommended for most real-world use cases. If you would
-    // like to specify the eBPF program at runtime rather than at compile-time, you can
-    // reach for `Bpf::load_file` instead.
-    let mut bpf = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/ebpfapp"
-    ))?;
-    let program: &mut Xdp = bpf.program_mut("ebpfapp").unwrap().try_into()?;
-    program.load()?;
-    program.attach(interface, XdpFlags::SKB_MODE)
-        .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
-
-    process_bpf_events(bpf)?;
-    Ok(())
-}
-
-fn process_bpf_events(bpf: Bpf) -> Result<(), anyhow::Error> {
+fn process_bpf_events(bpf: &Bpf) -> Result<(), anyhow::Error> {
     // Load buffers from each cpu as AsyncPerfEventArray is a per cpu ring buffer.
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("EVENTS")?)?;
     for cpu_id in online_cpus()? {
@@ -89,7 +72,19 @@ async fn main() -> Result<(), anyhow::Error> {
         ColorChoice::Auto,
     )?;
 
-    load_bpf(opt.iface.as_str())?;
+    // This will include your eBPF object file as raw bytes at compile-time and load it at
+    // runtime. This approach is recommended for most real-world use cases. If you would
+    // like to specify the eBPF program at runtime rather than at compile-time, you can
+    // reach for `Bpf::load_file` instead.
+    let mut bpf = Bpf::load(include_bytes_aligned!(
+        "../../target/bpfel-unknown-none/release/ebpfapp"
+    ))?;
+    let program: &mut Xdp = bpf.program_mut("ebpfapp").unwrap().try_into()?;
+    program.load()?;
+    program.attach(&opt.iface, XdpFlags::SKB_MODE)
+        .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
+
+    process_bpf_events(&bpf)?;
 
     info!("Listening on {}", &opt.iface);
     info!("Waiting for Ctrl-C...");

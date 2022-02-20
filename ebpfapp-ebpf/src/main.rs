@@ -10,8 +10,14 @@ use aya_bpf::{
     programs::XdpContext,
 };
 use bindings::{ethhdr, iphdr};
-use ebpfapp_common::PacketLog;
+use ebpfapp_common::{PacketLog, PacketType};
 use memoffset::offset_of;
+
+const IPPROTO_TCP: u8 = 6;
+const IPPROTO_UDP: u8 = 17;
+const IPPROTO_ICMP: u8 = 1;
+const ETH_P_IP: u16 = 0x0800;
+const ETH_HDR_LEN: usize = mem::size_of::<ethhdr>();
 
 #[inline(always)] // Inline due to limited support for function calls in ebpf programs
 unsafe fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
@@ -19,6 +25,7 @@ unsafe fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
     let end = ctx.data_end();
     let len = mem::size_of::<T>();
 
+    // Needed so that bpf verifier can verify data reads are valid
     if start + offset + len > end {
         return Err(());
     }
@@ -26,41 +33,75 @@ unsafe fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
     Ok((start + offset) as *const T)
 }
 
-const ETH_P_IP: u16 = 0x0800;
-const ETH_HDR_LEN: usize = mem::size_of::<ethhdr>();
-const IPPROTO_TCP: u8 = 6;
-const IPPROTO_UDP: u8 = 17;
-const IPPROTO_ICMP: u8 = 1;
+pub struct IPV4 {
+    source: u32,
+    destination: u32,
+    protocol: PacketType,
+}
 
-fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
-    let h_proto = u16::from_be(unsafe { *ptr_at(&ctx, offset_of!(ethhdr, h_proto))? });
-    if h_proto != ETH_P_IP {
-        return Ok(xdp_action::XDP_PASS);
-    }
+#[inline(always)]
+fn parse_ipv4(ctx: &XdpContext) -> Result<IPV4, ()> {
     let source = u32::from_be(unsafe { *ptr_at(&ctx, ETH_HDR_LEN + offset_of!(iphdr, saddr))? });
     let destination =
         u32::from_be(unsafe { *ptr_at(&ctx, ETH_HDR_LEN + offset_of!(iphdr, daddr))? });
 
-    let prot_be = u8::from_be(unsafe { *ptr_at(&ctx, ETH_HDR_LEN + offset_of!(iphdr, protocol))? });
+    let protocol_type =
+        match u8::from_be(unsafe { *ptr_at(&ctx, ETH_HDR_LEN + offset_of!(iphdr, protocol))? }) {
+            IPPROTO_TCP => PacketType::TCP,
+            IPPROTO_UDP => PacketType::UDP,
+            IPPROTO_ICMP => PacketType::ICMP,
+            _ => PacketType::UNKNOW,
+        };
 
-    // let protocol_type = match protoctol {
-    //     IPPROTO_TCP => DataType::TCP,
-    //     IPPROTO_UDP => DataType::UDP,
-    //     IPPROTO_ICMP => DataType::ICMP,
-    //     _ => DataType::UNKNOW
-    // };
-
-    let log_entry = PacketLog {
-        ipv4_address: source,
-        action: xdp_action::XDP_PASS,
-        ipv4_destination: destination,
-        packet_type: prot_be,
-    };
-    unsafe {
-        EVENTS.output(&ctx, &log_entry, 0);
-    }
-    Ok(xdp_action::XDP_PASS)
+    Ok(IPV4 {
+        source,
+        destination,
+        protocol: protocol_type,
+    })
 }
+
+#[inline(always)]
+fn is_ipv4(ctx: &XdpContext) -> Result<bool, ()> {
+    // Get protocol type of ethernet frame
+    let h_proto = u16::from_be(unsafe { *ptr_at(&ctx, offset_of!(ethhdr, h_proto))? });
+    // Check if it's ipv4, if isn't then allow it.
+    if h_proto != ETH_P_IP {
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+#[inline(always)]
+fn generate_log(parsed_ipv4: IPV4, action: u32) -> PacketLog {
+    PacketLog {
+        ipv4_address: parsed_ipv4.source,
+        action,
+        ipv4_destination: parsed_ipv4.destination,
+        packet_type: parsed_ipv4.protocol,
+    }
+}
+
+fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
+    let is_ipv4 = is_ipv4(&ctx)?;
+    if is_ipv4 == false {
+        return Ok(xdp_action::XDP_PASS);
+    }
+
+    let parsed_ipv4 = parse_ipv4(&ctx)?;
+
+    match parsed_ipv4.protocol {
+        PacketType::ICMP => {
+            let log_entry = generate_log(parsed_ipv4, xdp_action::XDP_PASS);
+            unsafe {
+                EVENTS.output(&ctx, &log_entry, 0);
+            }
+
+            Ok(xdp_action::XDP_DROP)
+        }
+        _ => Ok(xdp_action::XDP_PASS),
+    }
+}
+
 #[map(name = "EVENTS")]
 static mut EVENTS: PerfEventArray<PacketLog> = PerfEventArray::with_max_entries(1034, 0);
 
@@ -70,10 +111,6 @@ pub fn ebpfapp(ctx: XdpContext) -> u32 {
         Ok(ret) => ret,
         Err(_) => xdp_action::XDP_ABORTED,
     }
-}
-
-unsafe fn try_ebpfapp(_ctx: XdpContext) -> Result<u32, u32> {
-    Ok(xdp_action::XDP_PASS)
 }
 
 #[panic_handler]

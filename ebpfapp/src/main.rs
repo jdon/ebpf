@@ -1,20 +1,22 @@
 mod parser;
 use anyhow::Context;
 use aya::maps::perf::{AsyncPerfEventArray, Events};
+use aya::maps::HashMap;
 use aya::programs::{Xdp, XdpFlags};
 use aya::util::online_cpus;
 use aya::{include_bytes_aligned, Bpf};
 use bytes::BytesMut;
-use ebpfapp_common::{PacketLog, PacketType};
+use ebpfapp_common::{PacketLog, PacketType, XdpAction};
 use log::info;
 use parser::Packet;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
 use std::convert::{TryFrom, TryInto};
 use std::net::{self, Ipv4Addr};
 use structopt::StructOpt;
+use tokio::sync::mpsc;
 use tokio::{signal, task};
 
-use crate::parser::{parse_buf, PacketToString};
+use crate::parser::{parse_buf, ParserToString};
 
 #[derive(Debug, StructOpt)]
 struct Opt {
@@ -22,10 +24,34 @@ struct Opt {
     iface: String,
 }
 
+#[derive(Debug)]
+pub enum Command {
+    Block { ip: Ipv4Addr },
+    Allow { ip: Ipv4Addr },
+}
+
 fn process_bpf_events(bpf: &Bpf) -> Result<(), anyhow::Error> {
     // Load buffers from each cpu as AsyncPerfEventArray is a per cpu ring buffer.
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("EVENTS")?)?;
+    let mut action_list: HashMap<_, u32, u32> = HashMap::try_from(bpf.map_mut("ACTION_LIST")?)?;
+
+    let (tx, mut rx) = mpsc::channel::<Command>(32);
+
+    tokio::spawn(async move {
+        while let Some(cmd) = rx.recv().await {
+            let _ = match cmd {
+                Command::Block { ip } => {
+                    action_list.insert(u32::from(ip), XdpAction::DROP as u32, 0)
+                }
+                Command::Allow { ip } => {
+                    action_list.insert(u32::from(ip), XdpAction::PASS as u32, 0)
+                }
+            };
+        }
+    });
+
     for cpu_id in online_cpus()? {
+        let tx = tx.clone();
         let mut buf = perf_array.open(cpu_id, None)?;
         task::spawn(async move {
             let mut buffers = (0..10)
@@ -37,6 +63,12 @@ fn process_bpf_events(bpf: &Bpf) -> Result<(), anyhow::Error> {
                 for i in 0..events.read {
                     let buf = &mut buffers[i];
                     let packet = parse_and_log_packet(buf);
+                    // block icmp packets
+                    if packet.packet_type == PacketType::ICMP {
+                        let _ = tx.send(Command::Block { ip: packet.source }).await;
+                    } else {
+                        let _ = tx.send(Command::Allow { ip: packet.source }).await;
+                    }
                 }
             }
         });
@@ -53,7 +85,7 @@ fn parse_and_log_packet(buf: &mut BytesMut) -> Packet {
         packet.destination,
         packet.packet_type.to_str(),
         packet.packet_type as u8,
-        packet.action
+        packet.action.to_str(),
     );
     packet
 }

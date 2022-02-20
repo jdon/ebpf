@@ -1,16 +1,16 @@
 #![no_std]
 #![no_main]
 mod bindings;
-use core::mem;
+use core::{mem, ptr::addr_of};
 
 use aya_bpf::{
     bindings::xdp_action,
     macros::{map, xdp},
-    maps::PerfEventArray,
+    maps::{HashMap, PerfEventArray},
     programs::XdpContext,
 };
 use bindings::{ethhdr, iphdr};
-use ebpfapp_common::{PacketLog, PacketType};
+use ebpfapp_common::{PacketLog, PacketType, XdpAction};
 use memoffset::offset_of;
 
 const IPPROTO_TCP: u8 = 6;
@@ -72,7 +72,7 @@ fn is_ipv4(ctx: &XdpContext) -> Result<bool, ()> {
 }
 
 #[inline(always)]
-fn generate_log(parsed_ipv4: IPV4, action: u32) -> PacketLog {
+fn generate_log(parsed_ipv4: IPV4, action: XdpAction) -> PacketLog {
     PacketLog {
         ipv4_address: parsed_ipv4.source,
         action,
@@ -86,24 +86,33 @@ fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
     if is_ipv4 == false {
         return Ok(xdp_action::XDP_PASS);
     }
-
     let parsed_ipv4 = parse_ipv4(&ctx)?;
 
-    match parsed_ipv4.protocol {
-        PacketType::ICMP => {
-            let log_entry = generate_log(parsed_ipv4, xdp_action::XDP_PASS);
-            unsafe {
-                EVENTS.output(&ctx, &log_entry, 0);
+    if let Some(action) = unsafe { ACTION_LIST.get(&parsed_ipv4.source) } {
+        match action {
+            XdpAction::PASS => {}
+            _ => {
+                let log_entry = generate_log(parsed_ipv4, *action);
+                unsafe { EVENTS.output(&ctx, &log_entry, 0) };
             }
+        };
 
-            Ok(xdp_action::XDP_DROP)
-        }
-        _ => Ok(xdp_action::XDP_PASS),
+        return Ok(*action as u32);
     }
+
+    let log_entry = generate_log(parsed_ipv4, XdpAction::PASS);
+    unsafe {
+        EVENTS.output(&ctx, &log_entry, 0);
+    }
+
+    Ok(xdp_action::XDP_PASS)
 }
 
 #[map(name = "EVENTS")]
 static mut EVENTS: PerfEventArray<PacketLog> = PerfEventArray::with_max_entries(1034, 0);
+
+#[map(name = "ACTION_LIST")]
+static mut ACTION_LIST: HashMap<u32, XdpAction> = HashMap::with_max_entries(1024, 0);
 
 #[xdp(name = "ebpfapp")]
 pub fn ebpfapp(ctx: XdpContext) -> u32 {

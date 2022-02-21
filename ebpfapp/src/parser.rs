@@ -1,5 +1,5 @@
 use bytes::BytesMut;
-use ebpfapp_common::{PacketLog, PacketType, XdpAction};
+use ebpfapp_common::{PacketType, XdpAction};
 use std::net::Ipv4Addr;
 
 pub struct Packet {
@@ -38,7 +38,7 @@ impl ParserToString for XdpAction {
 }
 
 pub fn parse_buf(buf: &mut BytesMut) -> Packet {
-    let ptr = buf.as_ptr() as *const PacketLog;
+    let ptr = buf.as_ptr().cast::<ebpfapp_common::PacketLog>();
     let data = unsafe { ptr.read_unaligned() };
     let src_addr = Ipv4Addr::from(data.ipv4_address);
     let dst_addr = Ipv4Addr::from(data.ipv4_destination);

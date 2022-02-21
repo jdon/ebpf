@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 mod bindings;
-use core::{mem, ptr::addr_of};
+use core::mem;
 
 use aya_bpf::{
     bindings::xdp_action,
@@ -41,12 +41,12 @@ pub struct IPV4 {
 
 #[inline(always)]
 fn parse_ipv4(ctx: &XdpContext) -> Result<IPV4, ()> {
-    let source = u32::from_be(unsafe { *ptr_at(&ctx, ETH_HDR_LEN + offset_of!(iphdr, saddr))? });
+    let source = u32::from_be(unsafe { *ptr_at(ctx, ETH_HDR_LEN + offset_of!(iphdr, saddr))? });
     let destination =
-        u32::from_be(unsafe { *ptr_at(&ctx, ETH_HDR_LEN + offset_of!(iphdr, daddr))? });
+        u32::from_be(unsafe { *ptr_at(ctx, ETH_HDR_LEN + offset_of!(iphdr, daddr))? });
 
     let protocol_type =
-        match u8::from_be(unsafe { *ptr_at(&ctx, ETH_HDR_LEN + offset_of!(iphdr, protocol))? }) {
+        match u8::from_be(unsafe { *ptr_at(ctx, ETH_HDR_LEN + offset_of!(iphdr, protocol))? }) {
             IPPROTO_TCP => PacketType::TCP,
             IPPROTO_UDP => PacketType::UDP,
             IPPROTO_ICMP => PacketType::ICMP,
@@ -63,7 +63,7 @@ fn parse_ipv4(ctx: &XdpContext) -> Result<IPV4, ()> {
 #[inline(always)]
 fn is_ipv4(ctx: &XdpContext) -> Result<bool, ()> {
     // Get protocol type of ethernet frame
-    let h_proto = u16::from_be(unsafe { *ptr_at(&ctx, offset_of!(ethhdr, h_proto))? });
+    let h_proto = u16::from_be(unsafe { *ptr_at(ctx, offset_of!(ethhdr, h_proto))? });
     // Check if it's ipv4, if isn't then allow it.
     if h_proto == ETH_P_IP {
         return Ok(true);
@@ -81,20 +81,18 @@ fn generate_log(parsed_ipv4: IPV4, action: XdpAction) -> PacketLog {
     }
 }
 
-fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
-    let is_ipv4 = is_ipv4(&ctx)?;
-    if is_ipv4 == false {
+fn try_xdp_firewall(ctx: &XdpContext) -> Result<u32, ()> {
+    let is_ipv4 = is_ipv4(ctx)?;
+    if !is_ipv4 {
         return Ok(xdp_action::XDP_PASS);
     }
-    let parsed_ipv4 = parse_ipv4(&ctx)?;
+    let parsed_ipv4 = parse_ipv4(ctx)?;
 
     if let Some(action) = unsafe { ACTION_LIST.get(&parsed_ipv4.source) } {
-        match action {
-            XdpAction::PASS => {}
-            _ => {
-                let log_entry = generate_log(parsed_ipv4, *action);
-                unsafe { EVENTS.output(&ctx, &log_entry, 0) };
-            }
+        if let XdpAction::PASS = action {
+        } else {
+            let log_entry = generate_log(parsed_ipv4, *action);
+            unsafe { EVENTS.output(ctx, &log_entry, 0) };
         };
 
         return Ok(*action as u32);
@@ -102,7 +100,7 @@ fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
 
     let log_entry = generate_log(parsed_ipv4, XdpAction::PASS);
     unsafe {
-        EVENTS.output(&ctx, &log_entry, 0);
+        EVENTS.output(ctx, &log_entry, 0);
     }
 
     Ok(xdp_action::XDP_PASS)
@@ -116,7 +114,7 @@ static mut ACTION_LIST: HashMap<u32, XdpAction> = HashMap::with_max_entries(1024
 
 #[xdp(name = "ebpfapp")]
 pub fn ebpfapp(ctx: XdpContext) -> u32 {
-    match { try_xdp_firewall(ctx) } {
+    match { try_xdp_firewall(&ctx) } {
         Ok(ret) => ret,
         Err(_) => xdp_action::XDP_ABORTED,
     }

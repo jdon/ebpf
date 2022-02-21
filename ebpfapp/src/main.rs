@@ -1,17 +1,17 @@
 mod parser;
 use anyhow::Context;
-use aya::maps::perf::{AsyncPerfEventArray, Events};
+use aya::maps::perf::AsyncPerfEventArray;
 use aya::maps::HashMap;
 use aya::programs::{Xdp, XdpFlags};
 use aya::util::online_cpus;
 use aya::{include_bytes_aligned, Bpf};
 use bytes::BytesMut;
-use ebpfapp_common::{PacketLog, PacketType, XdpAction};
+use ebpfapp_common::{PacketType, XdpAction};
 use log::info;
 use parser::Packet;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
 use std::convert::{TryFrom, TryInto};
-use std::net::{self, Ipv4Addr};
+use std::net::Ipv4Addr;
 use structopt::StructOpt;
 use tokio::sync::mpsc;
 use tokio::{signal, task};
@@ -30,38 +30,22 @@ pub enum Command {
     Allow { ip: Ipv4Addr },
 }
 
-fn process_bpf_events(bpf: &Bpf) -> Result<(), anyhow::Error> {
+fn process_bpf_events(bpf: &Bpf, tx: &mpsc::Sender<Command>) -> Result<(), anyhow::Error> {
     // Load buffers from each cpu as AsyncPerfEventArray is a per cpu ring buffer.
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("EVENTS")?)?;
-    let mut action_list: HashMap<_, u32, u32> = HashMap::try_from(bpf.map_mut("ACTION_LIST")?)?;
-
-    let (tx, mut rx) = mpsc::channel::<Command>(32);
-
-    tokio::spawn(async move {
-        while let Some(cmd) = rx.recv().await {
-            let _ = match cmd {
-                Command::Block { ip } => {
-                    action_list.insert(u32::from(ip), XdpAction::DROP as u32, 0)
-                }
-                Command::Allow { ip } => {
-                    action_list.insert(u32::from(ip), XdpAction::PASS as u32, 0)
-                }
-            };
-        }
-    });
 
     for cpu_id in online_cpus()? {
         let tx = tx.clone();
-        let mut buf = perf_array.open(cpu_id, None)?;
+        let mut per_cpu_buffer = perf_array.open(cpu_id, None)?;
         task::spawn(async move {
             let mut buffers = (0..10)
                 .map(|_| BytesMut::with_capacity(1024))
                 .collect::<Vec<_>>();
             // Process events
             loop {
-                let events = buf.read_events(&mut buffers).await.unwrap();
-                for i in 0..events.read {
-                    let buf = &mut buffers[i];
+                let events = per_cpu_buffer.read_events(&mut buffers).await.unwrap();
+                for buf in buffers.iter_mut().take(events.read) {
+                    // let buf = &mut buffers[i];
                     let packet = parse_and_log_packet(buf);
                     // block icmp packets
                     if packet.packet_type == PacketType::ICMP {
@@ -76,11 +60,29 @@ fn process_bpf_events(bpf: &Bpf) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn process_actions(bpf: &Bpf, mut rx: mpsc::Receiver<Command>) -> Result<(), anyhow::Error> {
+    // Load hash map
+    let mut action_list: HashMap<_, u32, u32> = HashMap::try_from(bpf.map_mut("ACTION_LIST")?)?;
+    tokio::spawn(async move {
+        while let Some(cmd) = rx.recv().await {
+            let _droppable = match cmd {
+                Command::Block { ip } => {
+                    action_list.insert(u32::from(ip), XdpAction::DROP as u32, 0)
+                }
+                Command::Allow { ip } => {
+                    action_list.insert(u32::from(ip), XdpAction::PASS as u32, 0)
+                }
+            };
+        }
+    });
+    Ok(())
+}
+
 fn parse_and_log_packet(buf: &mut BytesMut) -> Packet {
     let packet = parse_buf(buf);
     println!("{} - {}", packet.source, packet.destination);
     println!(
-        "LOG: SRC {}, DST{} , packet_type {} - {}, ACTION {}",
+        "LOG: SRC {}, DST {} , packet_type {} - {}, ACTION {}",
         packet.source,
         packet.destination,
         packet.packet_type.to_str(),
@@ -113,10 +115,13 @@ async fn main() -> Result<(), anyhow::Error> {
     ))?;
     let program: &mut Xdp = bpf.program_mut("ebpfapp").unwrap().try_into()?;
     program.load()?;
-    program.attach(&opt.iface, XdpFlags::SKB_MODE)
+    program.attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
 
-    process_bpf_events(&bpf)?;
+    let (tx, rx) = mpsc::channel::<Command>(32);
+    process_actions(&bpf, rx)?;
+
+    process_bpf_events(&bpf, &tx)?;
 
     info!("Listening on {}", &opt.iface);
     info!("Waiting for Ctrl-C...");

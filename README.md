@@ -1,6 +1,6 @@
 # ebpfapp
 
-## To develop in virtual studio code
+## To develop in visual studio code
 
 1. Run `vagrant up` to boot a VM with BPF enabled in the kernel.
 2. Run `vagrant ssh-config > .vagrant_ssh_config` to generate an ssh config.
